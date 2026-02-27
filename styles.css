@@ -1,0 +1,131 @@
+/* --------------------------------------------------
+ CSS (NEON + GLOW + DEPTH)
+-------------------------------------------------- */
+
+/* ===== BACKGROUND ===== */
+[data-testid="stAppViewContainer"] {
+    background: radial-gradient(circle at top, #020617, #000000 70%);
+}
+
+/* ===== SIDEBAR ===== */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #020617, #000000);
+    border-right: 3px solid #2f434d;
+}
+
+/* ===== TEXT ===== */
+h1, h2, h3, h4 {
+    color: #ffffff !important;
+    text-shadow: 0 0 12px rgba(14,165,233,0.4);
+}
+
+p, span, label {
+    color: #e5e7eb !important;
+    font-size: 16px;
+}
+
+/* ===== HERO ===== */
+.hero {
+    background: linear-gradient(135deg, #1e3a8a, #020617);
+    padding: 90px;
+    border-radius: 30px;
+    text-align: center;
+    margin-bottom: 50px;
+    box-shadow: 0 0 60px rgba(56,189,248,0.35);
+}
+
+.hero h1 {
+    font-size: 72px;
+    font-weight: 900;
+}
+
+.hero p {
+    font-size: 24px;
+    color: #bae6fd;
+}
+
+/* ===== CARDS GRID ===== */
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 28px;
+    margin-bottom: 50px;
+}
+
+/* ===== CARDS ===== */
+.card {
+    background: linear-gradient(180deg, #020617, #020617);
+    border-radius: 24px;
+    padding: 32px;
+    border: 1px solid rgba(56,189,248,0.4);
+    box-shadow: 0 0 25px rgba(14,165,233,0.15);
+    transition: all 0.35s ease;
+}
+
+/* ===== CARD GIFS ===== */
+.card img {
+    width: 300px;
+    height: 150px;
+    margin-bottom: 20px;
+    filter: drop-shadow(0 0 10px rgba(90,90,90,0.6));
+    object-fit: cover; 
+}
+
+.card:hover {
+    transform: translateY(-12px) scale(1.03);
+    box-shadow:
+        0 0 20px rgba(56,189,248,0.9),
+        0 0 40px rgba(14,165,233,0.6);
+}
+
+.card h4 {
+    color: #38bdf8;
+    font-size: 22px;
+    margin-top: 15px;
+}
+
+/* ===== SECTIONS ===== */
+.section-box {
+    background: linear-gradient(180deg, #020617, #000000);
+    padding: 20px;
+    border-radius: 26px;
+    border: 1px solid rgba(56,189,248,0.4);
+    box-shadow: 0 0 35px rgba(56,189,248,0.25);
+    margin-bottom: 30px;
+}
+
+/* ===== BUTTONS ===== */
+.stButton>button {
+    background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+    color: black;
+    font-weight: bold;
+    border-radius: 12px;
+    padding: 12px 26px;
+    border: none;
+    box-shadow: 0 0 20px rgba(83, 200, 250, 0.8);
+}
+
+.stButton>button:hover {
+    box-shadow: 0 0 10px rgb(125, 135, 135);
+}
+
+/* ===== DATAFRAME ===== */
+[data-testid="stDataFrame"] {
+    border-radius: 20px;
+    box-shadow: 0 0 25px rgba(14,165,233,0.3);
+}
+
+/* ===== ANIMATED TITLES ===== */
+.animated-title {
+    font-size: 42px;
+    font-weight: 800;
+    text-align: center;
+    color: #38bdf8;
+    margin-bottom: 25px;
+    animation: glowFade 2.5s ease-in-out infinite alternate;
+}
+
+@keyframes glowFade {
+    0% { text-shadow: 0 0 8px rgba(56,189,248,0.4); transform: scale(1); }
+    100% { text-shadow: 0 0 25px rgba(56,189,248,0.9); transform: scale(1.03); }
+}
