@@ -253,7 +253,7 @@ if section == "Dashboard":
         </div>
         <div class="card">
             <img src="https://media.giphy.com/media/xT9IgzoKnwFNmISR8I/giphy.gif" width="160">
-            <h2>Topic Modeling</h2>
+            <h1>Topic Modeling</h1>
             <p>Extracts dominant discussion themes.</p>
         </div>
         <div class="card">
