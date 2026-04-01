@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
+from gensim import corpora, models
+import re
 import numpy as np 
+import plotly.express as px
 import matplotlib.pyplot as plt
 import seaborn as sns
 from textblob import TextBlob
@@ -104,6 +107,46 @@ def analyze_comments(df):
     return df
 
 df = analyze_comments(df)
+# ---------------- LDA FUNCTION ----------------
+@st.cache_data
+def run_lda(df, num_topics=5):
+
+    def clean_text(text):
+        text = text.lower()
+        text = re.sub(r'[^a-zA-Z\s]', '', text)
+        return text.split()
+
+    texts = df['Comment'].dropna().apply(clean_text)
+
+    stop_words = set(stopwords.words('english'))
+    texts = [[word for word in doc if word not in stop_words] for doc in texts]
+
+    dictionary = corpora.Dictionary(texts)
+    corpus = [dictionary.doc2bow(text) for text in texts]
+
+    lda_model = models.LdaModel(
+        corpus,
+        num_topics=num_topics,
+        id2word=dictionary,
+        passes=10
+    )
+
+    topics = lda_model.print_topics(num_words=5)
+
+    return topics
+
+def get_topic_names(lda_model, num_words=3):
+    topic_names = {}
+
+    for i, topic in lda_model.show_topics(num_topics=-1, num_words=num_words, formatted=False):
+        words = [word for word, prob in topic]
+        
+        # Create readable name
+        name = " ".join(words[:3]).title()
+        
+        topic_names[i] = name
+
+    return topic_names
 
 # --------------------------------------------------
 # SIDEBAR NAVIGATION
@@ -143,6 +186,40 @@ def generate_wordcloud(text):
         stopwords=set(stopwords.words('english'))
     ).generate(text)
 
+from gensim import corpora
+from gensim.models import LdaModel
+import re
+
+@st.cache_data
+def run_lda(df, num_topics=5):
+    texts = df['Comment'].dropna().tolist()
+
+    # Clean text
+    cleaned = [
+        re.sub(r'[^a-zA-Z ]', '', text.lower()).split()
+        for text in texts
+    ]
+
+    # Remove stopwords
+    stop_words = set(stopwords.words('english'))
+    cleaned = [[word for word in doc if word not in stop_words] for doc in cleaned]
+
+    # Create dictionary & corpus
+    dictionary = corpora.Dictionary(cleaned)
+    corpus = [dictionary.doc2bow(text) for text in cleaned]
+
+    # Train LDA model
+    lda_model = LdaModel(
+        corpus,
+        num_topics=num_topics,
+        id2word=dictionary,
+        passes=10
+    )
+
+    # Extract topics
+    topics = lda_model.print_topics(num_words=6)
+
+    return topics
 # --------------------------------------------------
 # SECTION HELPERS
 # --------------------------------------------------
@@ -224,10 +301,28 @@ elif section == "Dataset Overview":
 # --------------------------------------------------
 elif section == "Sentiment Analysis":
     section_container("😊 Sentiment Analysis")
+
     counts = df['Sentiment Category'].value_counts()
-    fig, ax = plt.subplots(figsize=(11,5))
-    sns.barplot(x=counts.index, y=counts.values, ax=ax)
-    st.pyplot(fig)
+
+    # 🔥 Dynamic chart toggle
+    chart_type = st.radio("Select Chart Type", ["Bar Chart", "Pie Chart"])
+
+    if chart_type == "Bar Chart":
+        fig = px.bar(
+            x=counts.index,
+            y=counts.values,
+            labels={'x': 'Sentiment', 'y': 'Count'},
+            title="Sentiment Distribution",
+            color=counts.index
+        )
+    else:
+        fig = px.pie(
+            values=counts.values,
+            names=counts.index,
+            title="Sentiment Proportion"
+        )
+
+    st.plotly_chart(fig, use_container_width=True)
     end_section()
 
 # --------------------------------------------------
@@ -235,10 +330,18 @@ elif section == "Sentiment Analysis":
 # --------------------------------------------------
 elif section == "Sentiment Over Time":
     section_container("📈 Sentiment Over Time")
-    trend = df.groupby('Date')['Sentiment'].mean()
-    fig, ax = plt.subplots(figsize=(12,5))
-    trend.plot(ax=ax)
-    st.pyplot(fig)
+
+    trend = df.groupby('Date')['Sentiment'].mean().reset_index()
+
+    fig = px.line(
+        trend,
+        x='Date',
+        y='Sentiment',
+        title="Average Sentiment Over Time",
+        markers=True
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
     end_section()
 
 # --------------------------------------------------
@@ -250,9 +353,11 @@ elif section == "Topic Modeling":
     # ---------------- WORD CLOUD ----------------
     text_data = " ".join(df['Comment'].dropna())
     wc = generate_wordcloud(text_data)
+
     fig_wc, ax_wc = plt.subplots(figsize=(12, 5))
     ax_wc.imshow(np.array(wc.to_image()))
     ax_wc.axis("off")
+
     st.subheader("📌 Discussion Word Cloud")
     st.pyplot(fig_wc)
 
@@ -269,30 +374,59 @@ elif section == "Topic Modeling":
 
     trend_df = df[['Date', 'Comment']].copy()
 
+    # Create topic columns
     for topic, keywords in topic_keywords.items():
         trend_df[topic] = trend_df['Comment'].str.lower().apply(
             lambda x: any(word in x for word in keywords)
         )
 
+    # Count topic occurrences per date
     trend_counts = trend_df.groupby('Date')[list(topic_keywords.keys())].sum()
+    trend_counts_reset = trend_counts.reset_index()
 
-    fig, ax = plt.subplots(figsize=(14, 6))
-    for topic in topic_keywords.keys():
-        ax.plot(
-            trend_counts.index,
-            trend_counts[topic],
-            label=topic,
-            linewidth=2
+    # Convert to long format (for animation)
+    trend_long = trend_counts_reset.melt(
+        id_vars='Date',
+        var_name='Topic',
+        value_name='Count'
+    )
+
+    # ---------------- TOPIC SELECTOR ----------------
+    selected_topics = st.multiselect(
+        "Select Topics",
+        list(topic_keywords.keys()),
+        default=list(topic_keywords.keys())
+    )
+
+    st.info("💡 Use the play button ▶️ to see how topics evolve over time")
+
+    # ---------------- ANIMATED GRAPH ----------------
+    if selected_topics:
+        filtered_data = trend_long[trend_long['Topic'].isin(selected_topics)]
+
+        fig = px.bar(
+            filtered_data,
+            x='Topic',
+            y='Count',
+            color='Topic',
+            animation_frame="Date",
+            title="📊 Topic Evolution Over Time"
         )
 
-    ax.set_title("Topic-wise Discussion Trends Over Time")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Number of Comments")
-    ax.legend()
-    ax.grid(True)
-    plt.xticks(rotation=45)
+        st.plotly_chart(fig, use_container_width=True)
 
-    st.pyplot(fig)
+    else:
+        st.warning("⚠️ Please select at least one topic to display the graph.")
+
+        # ---------------- REAL LDA TOPICS ----------------
+    st.subheader("🧠 Discovered Topics (LDA Model)")
+
+    num_topics = st.slider("Select number of topics", 2, 10, 5)
+
+    topics = run_lda(df, num_topics)
+
+    for i, topic in topics:
+        st.write(f"**Topic {i+1}:** {topic}")
 
     end_section()
 
@@ -302,14 +436,23 @@ elif section == "Topic Modeling":
 # --------------------------------------------------
 elif section == "Toxicity Detection":
     section_container("⚠️ Toxicity Detection")
+
     counts = df['Toxic'].value_counts()
-    fig, ax = plt.subplots(figsize=(12, 5))
-    sns.barplot(
-        x=["Non-Toxic", "Toxic"],
-        y=[counts.get(False,0), counts.get(True,0)],
-        ax=ax
+
+    tox_df = pd.DataFrame({
+        "Category": ["Non-Toxic", "Toxic"],
+        "Count": [counts.get(False, 0), counts.get(True, 0)]
+    })
+
+    fig = px.bar(
+        tox_df,
+        x="Category",
+        y="Count",
+        color="Category",
+        title="Toxic vs Non-Toxic Comments"
     )
-    st.pyplot(fig)
+
+    st.plotly_chart(fig, use_container_width=True)
     end_section()
 
 # --------------------------------------------------
@@ -368,3 +511,4 @@ elif section == "Download Results":
         "text/csv"
     )
     end_section()
+
