@@ -248,7 +248,7 @@ if section == "Dashboard":
     <div class="card-grid">
         <div class="card">
             <img src="https://media.giphy.com/media/l0HlSNOxJB956qwfK/giphy.gif" width="115" height="150">
-            <h2>Sentiment Analysis</h2>
+            <h1>Sentiment Analysis</h1>
             <p>Measures emotional polarity of comments.</p>
         </div>
         <div class="card">
@@ -258,12 +258,12 @@ if section == "Dashboard":
         </div>
         <div class="card">
             <img src="https://media.giphy.com/media/26tn33aiTi1jkl6H6/giphy.gif">
-            <h2>Toxicity Detection</h2>
+            <h1>Toxicity Detection</h1>
             <p>Identifies abusive & harmful speech.</p>
         </div>
         <div class="card">
             <img src="https://media.giphy.com/media/3o7qE1YN7aBOFPRw8E/giphy.gif">
-            <h2>Live Analyzer</h2>
+            <h1>Live Analyzer</h1>
             <p>Instant analysis of new comments.</p>
         </div>
     </div>
