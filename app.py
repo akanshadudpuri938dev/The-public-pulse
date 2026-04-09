@@ -248,22 +248,22 @@ if section == "Dashboard":
     <div class="card-grid">
         <div class="card">
             <img src="https://media.giphy.com/media/l0HlSNOxJB956qwfK/giphy.gif" width="115" height="150">
-            <h1>Sentiment Analysis</h1>
+            <h2>Sentiment Analysis</h2>
             <p>Measures emotional polarity of comments.</p>
         </div>
         <div class="card">
             <img src="https://media.giphy.com/media/xT9IgzoKnwFNmISR8I/giphy.gif" width="160">
-            <h1>Topic Modeling</h1>
+            <h2>Topic Modeling</h2>
             <p>Extracts dominant discussion themes.</p>
         </div>
         <div class="card">
             <img src="https://media.giphy.com/media/26tn33aiTi1jkl6H6/giphy.gif">
-            <h1>Toxicity Detection</h1>
+            <h2>Toxicity Detection</h2>
             <p>Identifies abusive & harmful speech.</p>
         </div>
         <div class="card">
             <img src="https://media.giphy.com/media/3o7qE1YN7aBOFPRw8E/giphy.gif">
-            <h1>Live Analyzer</h1>
+            <h2>Live Analyzer</h2>
             <p>Instant analysis of new comments.</p>
         </div>
     </div>
@@ -511,4 +511,3 @@ elif section == "Download Results":
         "text/csv"
     )
     end_section()
-
