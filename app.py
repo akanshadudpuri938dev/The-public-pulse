@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
-from gensim import corpora, models
+from gensim import corpora
+from gensim.models import LdaModel
 import re
 import numpy as np 
 import plotly.express as px
@@ -79,13 +80,81 @@ df = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)]
 # --------------------------------------------------
 # ANALYSIS (CACHED)
 # --------------------------------------------------
+toxic_words = [# insults
+    "idiot", "moron", "dumb", "stupid", "retard",
+    "loser", "clown", "fool", "imbecile",
+    "pathetic", "useless", "worthless",
+    "garbage", "trash", "scum",
+
+    # violence
+    "kill", "killing", "die", "dead",
+    "murder", "destroy", "burn",
+    "attack", "terrorist",
+
+    # hate
+    "hate", "hateful", "disgusting",
+    "racist", "sexist", "bigot",
+    "nazi", "extremist",
+
+    # toxic slang
+    "cringe", "lame",
+    "fake", "fraud", "scam",
+    "hypocrite", "liar",
+    "brainwashed", "delusional"]
+def get_sentiment(text):
+    text = str(text).lower()
+
+    # ---------------- HANDLE CONTRAST WORDS ----------------
+    if "but" in text:
+        parts = text.split("but")
+        text = parts[-1]   # focus on last part (more important)
+
+    # ---------------- BASE SENTIMENT ----------------
+    score = TextBlob(text).sentiment.polarity
+
+    # ---------------- TOXIC COUNT USING REGEX ----------------
+    pattern = r'\b(' + '|'.join(toxic_words) + r')\b'
+    toxic_matches = re.findall(pattern, text)
+    toxic_count = len(toxic_matches)
+
+    # ---------------- STRONG NEGATIVE PHRASES ----------------
+    strong_negative_phrases = [
+        "piece of shit", "full of shit", "absolute trash",
+        "utter garbage", "complete nonsense"
+    ]
+
+    for phrase in strong_negative_phrases:
+        if phrase in text:
+            score -= 1   # strong override
+
+    # ---------------- NEGATION HANDLING ----------------
+    if "not good" in text or "not nice" in text:
+        score -= 0.5
+
+    if "not bad" in text:
+        score += 0.3
+
+    # ---------------- FINAL ADJUSTMENT ----------------
+    score = score - (0.6 * toxic_count)
+
+    # Clamp
+    score = max(min(score, 1), -1)
+
+    return score
 @st.cache_data
 def analyze_comments(df):
     df = df.copy()
 
+    
+    # ---------------- IMPROVED SENTIMENT FUNCTION ----------------
+   
     # Sentiment
-    df['Sentiment'] = df['Comment'].apply(
-        lambda x: TextBlob(x).sentiment.polarity
+    
+    df['Sentiment'] = df['Comment'].apply(get_sentiment)
+
+    # ✅ ADD THIS HERE
+    df['Subjectivity'] = df['Comment'].apply(
+        lambda x: TextBlob(str(x)).sentiment.subjectivity
     )
 
     def sentiment_label(score):
@@ -99,41 +168,23 @@ def analyze_comments(df):
     df['Sentiment Category'] = df['Sentiment'].apply(sentiment_label)
 
     # Toxicity
-    toxic_words = ['hate', 'kill', 'idiot', 'stupid', 'racist', 'terrorist']
-    df['Toxic'] = df['Comment'].apply(
-        lambda x: any(word in x.lower() for word in toxic_words)
+    
+
+    # Create regex pattern
+    pattern = r'\b(' + '|'.join(toxic_words) + r')\b'
+
+    # Apply vectorized matching
+    # Count toxic words per comment
+    df['Toxic Count'] = df['Comment'].fillna('').str.lower().apply(
+        lambda x: len(re.findall(pattern, x))
     )
+
+    # Binary toxicity
+    df['Toxic'] = df['Toxic Count'] > 0
 
     return df
 
 df = analyze_comments(df)
-# ---------------- LDA FUNCTION ----------------
-@st.cache_data
-def run_lda(df, num_topics=5):
-
-    def clean_text(text):
-        text = text.lower()
-        text = re.sub(r'[^a-zA-Z\s]', '', text)
-        return text.split()
-
-    texts = df['Comment'].dropna().apply(clean_text)
-
-    stop_words = set(stopwords.words('english'))
-    texts = [[word for word in doc if word not in stop_words] for doc in texts]
-
-    dictionary = corpora.Dictionary(texts)
-    corpus = [dictionary.doc2bow(text) for text in texts]
-
-    lda_model = models.LdaModel(
-        corpus,
-        num_topics=num_topics,
-        id2word=dictionary,
-        passes=10
-    )
-
-    topics = lda_model.print_topics(num_words=5)
-
-    return topics
 
 def get_topic_names(lda_model, num_words=3):
     topic_names = {}
@@ -186,9 +237,6 @@ def generate_wordcloud(text):
         stopwords=set(stopwords.words('english'))
     ).generate(text)
 
-from gensim import corpora
-from gensim.models import LdaModel
-import re
 
 @st.cache_data
 def run_lda(df, num_topics=5):
@@ -199,6 +247,8 @@ def run_lda(df, num_topics=5):
         re.sub(r'[^a-zA-Z ]', '', text.lower()).split()
         for text in texts
     ]
+    # REMOVE EMPTY DOCUMENTS
+    cleaned = [doc for doc in cleaned if len(doc) > 2]
 
     # Remove stopwords
     stop_words = set(stopwords.words('english'))
@@ -206,6 +256,8 @@ def run_lda(df, num_topics=5):
 
     # Create dictionary & corpus
     dictionary = corpora.Dictionary(cleaned)
+
+    dictionary.filter_extremes(no_below=5, no_above=0.5)
     corpus = [dictionary.doc2bow(text) for text in cleaned]
 
     # Train LDA model
@@ -271,7 +323,7 @@ if section == "Dashboard":
 
     total_comments = df.shape[0]
     positive_pct = (df['Sentiment Category'] == "Positive").mean() * 100
-    toxic_pct = (df['Toxic'] == True).mean() * 100
+    toxic_pct = (df['Toxic Count'] > 0).mean() * 100
 
     st.markdown("""
     <div class="section-box">
@@ -461,36 +513,14 @@ elif section == "Toxicity Detection":
 elif section == "Live Comment Analyzer":
     section_container("📝 Live Comment Analyzer")
 
-    custom_negative_words = [
-        "narcissist","idiot","stupid","hate","useless","loser",
-        "dumb","trash","ugly","pathetic","moron","fraud",
-        "scam","garbage","fool","disgusting","toxic","hypocrite",
-        "idiot", "stupid", "dumb", "moron", "fool", "loser", "clown",
-        "narcissist", "psycho", "crazy", "delusional", "pathetic",
-        "useless", "worthless", "trash", "garbage", "scum", "jerk",
-        "hate", "disgusting", "awful", "terrible", "horrible",
-        "worst", "toxic", "evil", "corrupt", "fake", "fraud",
-        "liar", "hypocrite", "shameful", "ridiculous",
-        "laughable", "embarrassing", "cringe", "lame",
-        "nonsense", "absurd", "ignorant", "illiterate",
-        "retard", "retarded", "snowflake", "bootlicker",
-        "simp", "clueless", "brainwashed", "triggered",
-        "propaganda", "sellout", "manipulative", "biased",
-        "dictator", "extremist", "radical",
-        "problematic", "questionable", "disturbing",
-        "concerning", "unacceptable","no sense"
-    ]
-
+    
     text = st.text_area("Enter a comment", height=200)
 
     if st.button("Analyze"):
 
-        score = TextBlob(text).sentiment.polarity
-        text_lower = text.lower()
-
-        if any(word in text_lower for word in custom_negative_words):
-            st.error("Negative 😠")
-        elif score > 0:
+        score = get_sentiment(text)
+       
+        if score > 0:
             st.success("Positive 😊")
         elif score < 0:
             st.error("Negative 😠")
