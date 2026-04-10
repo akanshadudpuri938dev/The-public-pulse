@@ -6,7 +6,6 @@ import re
 import numpy as np 
 import plotly.express as px
 import matplotlib.pyplot as plt
-import seaborn as sns
 from textblob import TextBlob
 from wordcloud import WordCloud
 import nltk
@@ -17,7 +16,10 @@ from nltk.corpus import stopwords
 # --------------------------------------------------
 @st.cache_resource
 def load_nltk():
-    nltk.download('stopwords')
+    try:
+        stopwords.words('english')
+    except:
+        nltk.download('stopwords')
 
 load_nltk()
 
@@ -103,7 +105,8 @@ toxic_words = [# insults
     "brainwashed", "delusional"]
 def get_sentiment(text):
     text = str(text).lower()
-
+    if not text.strip():
+        return 0
     # ---------------- HANDLE CONTRAST WORDS ----------------
     if "but" in text:
         parts = text.split("but")
@@ -171,8 +174,7 @@ def analyze_comments(df):
     
 
     # Create regex pattern
-    pattern = r'\b(' + '|'.join(toxic_words) + r')\b'
-
+    pattern = r'\b(' + '|'.join(map(re.escape, toxic_words)) + r')\b'
     # Apply vectorized matching
     # Count toxic words per comment
     df['Toxic Count'] = df['Comment'].fillna('').str.lower().apply(
@@ -249,6 +251,8 @@ def run_lda(df, num_topics=5):
     ]
     # REMOVE EMPTY DOCUMENTS
     cleaned = [doc for doc in cleaned if len(doc) > 2]
+    if len(cleaned) == 0:
+        return []
 
     # Remove stopwords
     stop_words = set(stopwords.words('english'))
@@ -477,8 +481,11 @@ elif section == "Topic Modeling":
 
     topics = run_lda(df, num_topics)
 
-    for i, topic in topics:
-        st.write(f"**Topic {i+1}:** {topic}")
+    if topics:
+        for i, topic in topics:
+            st.write(f"**Topic {i+1}:** {topic}")
+    else:
+        st.warning("Not enough data to generate topics")
 
     end_section()
 
