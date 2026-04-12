@@ -12,7 +12,7 @@ import nltk
 from nltk.corpus import stopwords
 
 # --------------------------------------------------
-# DOWNLOAD NLTK RESOURCES (CACHED)
+# DOWNLOAD NLTK RESOURCES 
 # --------------------------------------------------
 @st.cache_resource
 def load_nltk():
@@ -41,8 +41,8 @@ def load_css(file_name):
 
 load_css("styles.css")
 
-# --------------------------------------------------
-# LOAD DATA (FIXED TIMEZONE ISSUE)
+# -------------------------------------
+# LOAD DATA 
 # --------------------------------------------------
 @st.cache_data
 def load_data():
@@ -53,6 +53,7 @@ def load_data():
     df['Published At'] = pd.to_datetime(
         df['Published At'], errors='coerce', utc=True
     )
+
     df['Published At'] = df['Published At'].dt.tz_localize(None)
 
     # Keep Date as datetime (not string)
@@ -63,7 +64,7 @@ def load_data():
 df = load_data()
 
 # --------------------------------------------------
-# DATE FILTER (CORRECT & WORKING)
+# DATE FILTER 
 # --------------------------------------------------
 st.sidebar.markdown("### 📅 Filter by Date")
 
@@ -80,7 +81,7 @@ end_date = pd.to_datetime(end_date)
 df = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)]
 
 # --------------------------------------------------
-# ANALYSIS (CACHED)
+# ANALYSIS 
 # --------------------------------------------------
 toxic_words = [# insults
     "idiot", "moron", "dumb", "stupid", "retard",
@@ -110,7 +111,7 @@ def get_sentiment(text):
     # ---------------- HANDLE CONTRAST WORDS ----------------
     if "but" in text:
         parts = text.split("but")
-        text = parts[-1]   # focus on last part (more important)
+        text = parts[-1]   # focus on last part 
 
     # ---------------- BASE SENTIMENT ----------------
     score = TextBlob(text).sentiment.polarity
@@ -128,7 +129,7 @@ def get_sentiment(text):
 
     for phrase in strong_negative_phrases:
         if phrase in text:
-            score -= 1   # strong override
+            score -= 1  
 
     # ---------------- NEGATION HANDLING ----------------
     if "not good" in text or "not nice" in text:
@@ -149,10 +150,8 @@ def analyze_comments(df):
     df = df.copy()
 
     
-    # ---------------- IMPROVED SENTIMENT FUNCTION ----------------
+    # -----------SENTIMENT FUNCTION ----------------
    
-    # Sentiment
-    
     df['Sentiment'] = df['Comment'].apply(get_sentiment)
 
     # ✅ ADD THIS HERE
@@ -187,6 +186,8 @@ def analyze_comments(df):
     return df
 
 df = analyze_comments(df)
+
+
 
 def get_topic_names(lda_model, num_words=3):
     topic_names = {}
@@ -241,39 +242,44 @@ def generate_wordcloud(text):
 
 
 @st.cache_data
-def run_lda(df, num_topics=5):
+def run_lda(df, num_topics=3):
     texts = df['Comment'].dropna().tolist()
 
-    # Clean text
-    cleaned = [
-        re.sub(r'[^a-zA-Z ]', '', text.lower()).split()
-        for text in texts
-    ]
-    # REMOVE EMPTY DOCUMENTS
-    cleaned = [doc for doc in cleaned if len(doc) > 2]
-    if len(cleaned) == 0:
+    stop_words = set(stopwords.words('english'))
+
+    # Better cleaning 
+    cleaned_texts = []
+    for text in texts:
+        text = text.lower()
+        text = re.sub(r'[^a-zA-Z ]', '', text)
+        tokens = text.split()
+
+        # remove stopwords + very short words
+        tokens = [w for w in tokens if w not in stop_words and len(w) > 2]
+
+        if len(tokens) > 3:
+            cleaned_texts.append(tokens)
+
+    if len(cleaned_texts) == 0:
         return []
 
-    # Remove stopwords
-    stop_words = set(stopwords.words('english'))
-    cleaned = [[word for word in doc if word not in stop_words] for doc in cleaned]
+    # Create dictionary
+    dictionary = corpora.Dictionary(cleaned_texts)
 
-    # Create dictionary & corpus
-    dictionary = corpora.Dictionary(cleaned)
+    # IMPROVEMENT: remove very frequent + very rare words
+    dictionary.filter_extremes(no_below=2, no_above=0.6)
 
-    dictionary.filter_extremes(no_below=5, no_above=0.5)
-    corpus = [dictionary.doc2bow(text) for text in cleaned]
+    corpus = [dictionary.doc2bow(text) for text in cleaned_texts]
 
-    # Train LDA model
     lda_model = LdaModel(
-        corpus,
+        corpus=corpus,
         num_topics=num_topics,
         id2word=dictionary,
-        passes=10
+        passes=15,
+        random_state=42
     )
 
-    # Extract topics
-    topics = lda_model.print_topics(num_words=6)
+    topics = lda_model.print_topics(num_words=5)
 
     return topics
 # --------------------------------------------------
@@ -440,7 +446,7 @@ elif section == "Topic Modeling":
     trend_counts = trend_df.groupby('Date')[list(topic_keywords.keys())].sum()
     trend_counts_reset = trend_counts.reset_index()
 
-    # Convert to long format (for animation)
+  
     trend_long = trend_counts_reset.melt(
         id_vars='Date',
         var_name='Topic',
@@ -548,3 +554,5 @@ elif section == "Download Results":
         "text/csv"
     )
     end_section()
+
+
